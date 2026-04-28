@@ -58,26 +58,34 @@ class BitcoinTracker {
     }
 
     async fetchCurrentPrice() {
-        const response = await fetch(
-            `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${this.currency}&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_high_low_24h=true`
-        );
+        try {
+            const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+            const url = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${this.currency}&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_high_low_24h=true`;
+            
+            const response = await fetch(url);
 
-        if (!response.ok) throw new Error('Failed to fetch current price');
-        return response.json();
+            if (!response.ok) throw new Error('Failed to fetch current price');
+            return response.json();
+        } catch (error) {
+            throw new Error('Unable to fetch Bitcoin price data. Please try again later.');
+        }
     }
 
     async fetchHistoricalData() {
-        const response = await fetch(
-            `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=${this.currency}&days=${this.days}&interval=daily`
-        );
+        try {
+            const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=${this.currency}&days=${this.days}&interval=daily`;
+            
+            const response = await fetch(url);
 
-        if (!response.ok) throw new Error('Failed to fetch historical data');
-        return response.json();
+            if (!response.ok) throw new Error('Failed to fetch historical data');
+            return response.json();
+        } catch (error) {
+            throw new Error('Unable to fetch historical data. Please try again later.');
+        }
     }
 
     updateStats(data) {
         const bitcoin = data.bitcoin;
-        const currency = this.currency.toUpperCase();
         const symbols = { usd: '$', eur: '€', gbp: '£', jpy: '¥' };
         const symbol = symbols[this.currency] || '$';
 
@@ -106,10 +114,6 @@ class BitcoinTracker {
         const ctx = document.getElementById('priceChart').getContext('2d');
         const prices = data.prices.map(p => p[1]);
         const dates = data.prices.map(p => new Date(p[0]).toLocaleDateString());
-
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        const avgPrice = prices.reduce((a, b) => a + b) / prices.length;
 
         if (this.chart) {
             this.chart.data.labels = dates;
