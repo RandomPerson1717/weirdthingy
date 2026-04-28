@@ -59,15 +59,20 @@ class BitcoinTracker {
 
     async fetchCurrentPrice() {
         try {
-            const corsProxy = 'https://cors-anywhere.herokuapp.com/';
             const url = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${this.currency}&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_high_low_24h=true`;
             
             const response = await fetch(url);
 
             if (!response.ok) throw new Error('Failed to fetch current price');
-            return response.json();
+            const data = await response.json();
+            
+            if (!data.bitcoin) {
+                throw new Error('Invalid data format received');
+            }
+            
+            return data;
         } catch (error) {
-            throw new Error('Unable to fetch Bitcoin price data. Please try again later.');
+            throw new Error('Unable to fetch Bitcoin price data. ' + error.message);
         }
     }
 
@@ -78,99 +83,137 @@ class BitcoinTracker {
             const response = await fetch(url);
 
             if (!response.ok) throw new Error('Failed to fetch historical data');
-            return response.json();
+            const data = await response.json();
+            
+            if (!data.prices || !Array.isArray(data.prices)) {
+                throw new Error('Invalid historical data format');
+            }
+            
+            return data;
         } catch (error) {
-            throw new Error('Unable to fetch historical data. Please try again later.');
+            throw new Error('Unable to fetch historical data. ' + error.message);
         }
     }
 
     updateStats(data) {
-        const bitcoin = data.bitcoin;
-        const symbols = { usd: '$', eur: '€', gbp: '£', jpy: '¥' };
-        const symbol = symbols[this.currency] || '$';
+        try {
+            const bitcoin = data.bitcoin;
+            
+            if (!bitcoin) {
+                throw new Error('Bitcoin data not available');
+            }
 
-        const currentPrice = bitcoin[this.currency];
-        const change24h = bitcoin[`${this.currency}_24h_change`];
-        const high24h = bitcoin[`${this.currency}_high_24h`];
-        const low24h = bitcoin[`${this.currency}_low_24h`];
+            const symbols = { usd: '$', eur: '€', gbp: '£', jpy: '¥' };
+            const symbol = symbols[this.currency] || '$';
 
-        document.getElementById('current-price').textContent = 
-            `${symbol}${currentPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+            const currentPrice = bitcoin[this.currency];
+            const change24h = bitcoin[`${this.currency}_24h_change`];
+            const high24h = bitcoin[`${this.currency}_high_24h`];
+            const low24h = bitcoin[`${this.currency}_low_24h`];
 
-        const changeColor = change24h >= 0 ? '#4caf50' : '#f44336';
-        const changeSign = change24h >= 0 ? '+' : '';
-        document.getElementById('change-24h').textContent = `${changeSign}${change24h.toFixed(2)}%`;
-        document.getElementById('change-24h').parentElement.style.background = 
-            `linear-gradient(135deg, ${changeColor} 0%, ${changeColor}dd 100%)`;
+            // Validate data exists
+            if (currentPrice === undefined || currentPrice === null) {
+                document.getElementById('current-price').textContent = 'N/A';
+            } else {
+                document.getElementById('current-price').textContent = 
+                    `${symbol}${currentPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+            }
 
-        document.getElementById('high-24h').textContent = 
-            `${symbol}${high24h.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+            if (change24h !== undefined && change24h !== null) {
+                const changeColor = change24h >= 0 ? '#4caf50' : '#f44336';
+                const changeSign = change24h >= 0 ? '+' : '';
+                document.getElementById('change-24h').textContent = `${changeSign}${change24h.toFixed(2)}%`;
+                document.getElementById('change-24h').parentElement.style.background = 
+                    `linear-gradient(135deg, ${changeColor} 0%, ${changeColor}dd 100%)`;
+            } else {
+                document.getElementById('change-24h').textContent = 'N/A';
+            }
 
-        document.getElementById('low-24h').textContent = 
-            `${symbol}${low24h.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+            if (high24h !== undefined && high24h !== null) {
+                document.getElementById('high-24h').textContent = 
+                    `${symbol}${high24h.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+            } else {
+                document.getElementById('high-24h').textContent = 'N/A';
+            }
+
+            if (low24h !== undefined && low24h !== null) {
+                document.getElementById('low-24h').textContent = 
+                    `${symbol}${low24h.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+            } else {
+                document.getElementById('low-24h').textContent = 'N/A';
+            }
+        } catch (error) {
+            console.error('Error updating stats:', error);
+            this.showError('Failed to update statistics: ' + error.message);
+        }
     }
 
     createChart(data) {
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        const prices = data.prices.map(p => p[1]);
-        const dates = data.prices.map(p => new Date(p[0]).toLocaleDateString());
+        try {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            const prices = data.prices.map(p => p[1]);
+            const dates = data.prices.map(p => new Date(p[0]).toLocaleDateString());
 
-        if (this.chart) {
-            this.chart.data.labels = dates;
-            this.chart.data.datasets[0].data = prices;
-            this.chart.update();
-        } else {
-            this.chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: [{
-                        label: `Bitcoin Price (${this.currency.toUpperCase()})`,
-                        data: prices,
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 6,
-                        pointBackgroundColor: '#667eea',
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            labels: {
-                                font: { size: 12 },
-                                padding: 15,
+            if (this.chart) {
+                this.chart.data.labels = dates;
+                this.chart.data.datasets[0].data = prices;
+                this.chart.update();
+            } else {
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: `Bitcoin Price (${this.currency.toUpperCase()})`,
+                            data: prices,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#667eea',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                labels: {
+                                    font: { size: 12 },
+                                    padding: 15,
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                titleFont: { size: 14 },
+                                bodyFont: { size: 12 },
+                                padding: 12,
+                                displayColors: false,
                             }
                         },
-                        tooltip: {
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            titleFont: { size: 14 },
-                            bodyFont: { size: 12 },
-                            padding: 12,
-                            displayColors: false,
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            ticks: {
-                                callback: function(value) {
-                                    return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            });
-        }
+                });
+            }
 
-        document.getElementById('priceChart').style.display = 'block';
+            document.getElementById('priceChart').style.display = 'block';
+        } catch (error) {
+            console.error('Error creating chart:', error);
+            this.showError('Failed to create chart: ' + error.message);
+        }
     }
 
     showLoading(show) {
