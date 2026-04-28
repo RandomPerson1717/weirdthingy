@@ -58,43 +58,32 @@ class BitcoinTracker {
     }
 
     async fetchCurrentPrice() {
-        try {
-            const url = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${this.currency}&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_high_low_24h=true`;
-            
-            const response = await fetch(url);
-
-            if (!response.ok) throw new Error('Failed to fetch current price');
-            const data = await response.json();
-            
-            if (!data.bitcoin) {
-                throw new Error('Invalid data format received');
-            }
-            
-            return data;
-        } catch (error) {
-            throw new Error('Unable to fetch Bitcoin price data. ' + error.message);
-        }
+    try {
+        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+        const apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${this.currency}&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_high_low_24h=true`;
+        const url = corsProxy + apiUrl;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch');
+        return response.json();
+    } catch (error) {
+        throw new Error('Unable to fetch Bitcoin data. Please try again.');
     }
+}
 
-    async fetchHistoricalData() {
-        try {
-            const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=${this.currency}&days=${this.days}&interval=daily`;
-            
-            const response = await fetch(url);
-
-            if (!response.ok) throw new Error('Failed to fetch historical data');
-            const data = await response.json();
-            
-            if (!data.prices || !Array.isArray(data.prices)) {
-                throw new Error('Invalid historical data format');
-            }
-            
-            return data;
-        } catch (error) {
-            throw new Error('Unable to fetch historical data. ' + error.message);
-        }
+async fetchHistoricalData() {
+    try {
+        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+        const apiUrl = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=${this.currency}&days=${this.days}&interval=daily`;
+        const url = corsProxy + apiUrl;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch');
+        return response.json();
+    } catch (error) {
+        throw new Error('Unable to fetch data. Please try again.');
     }
-
+}
     updateStats(data) {
         try {
             const bitcoin = data.bitcoin;
