@@ -40,11 +40,9 @@ class BitcoinTracker {
             this.showLoading(true);
             this.hideError();
 
-            // Fetch current price data
             const currentData = await this.fetchCurrentPrice();
             this.updateStats(currentData);
 
-            // Fetch historical data
             const historicalData = await this.fetchHistoricalData();
             this.createChart(historicalData);
 
@@ -58,32 +56,61 @@ class BitcoinTracker {
     }
 
     async fetchCurrentPrice() {
-    try {
-        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-        const apiUrl = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${this.currency}&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_high_low_24h=true`;
-        const url = corsProxy + apiUrl;
-        
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch');
-        return response.json();
-    } catch (error) {
-        throw new Error('Unable to fetch Bitcoin data. Please try again.');
-    }
-}
+        try {
+            const url = `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${this.currency}&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_high_low_24h=true`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
 
-async fetchHistoricalData() {
-    try {
-        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-        const apiUrl = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=${this.currency}&days=${this.days}&interval=daily`;
-        const url = corsProxy + apiUrl;
-        
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch');
-        return response.json();
-    } catch (error) {
-        throw new Error('Unable to fetch data. Please try again.');
+            if (!response.ok) {
+                throw new Error('API returned status ' + response.status);
+            }
+
+            const data = await response.json();
+            
+            if (!data || !data.bitcoin) {
+                throw new Error('Invalid response format from API');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('Price fetch error:', error);
+            throw new Error('Unable to fetch Bitcoin price. Please refresh and try again.');
+        }
     }
-}
+
+    async fetchHistoricalData() {
+        try {
+            const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=${this.currency}&days=${this.days}&interval=daily`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('API returned status ' + response.status);
+            }
+
+            const data = await response.json();
+            
+            if (!data || !data.prices || !Array.isArray(data.prices) || data.prices.length === 0) {
+                throw new Error('Invalid historical data format');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('Historical data fetch error:', error);
+            throw new Error('Unable to fetch historical data. Please refresh and try again.');
+        }
+    }
+
     updateStats(data) {
         try {
             const bitcoin = data.bitcoin;
@@ -100,12 +127,11 @@ async fetchHistoricalData() {
             const high24h = bitcoin[`${this.currency}_high_24h`];
             const low24h = bitcoin[`${this.currency}_low_24h`];
 
-            // Validate data exists
-            if (currentPrice === undefined || currentPrice === null) {
-                document.getElementById('current-price').textContent = 'N/A';
-            } else {
+            if (currentPrice !== undefined && currentPrice !== null) {
                 document.getElementById('current-price').textContent = 
                     `${symbol}${currentPrice.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+            } else {
+                document.getElementById('current-price').textContent = 'N/A';
             }
 
             if (change24h !== undefined && change24h !== null) {
@@ -133,7 +159,7 @@ async fetchHistoricalData() {
             }
         } catch (error) {
             console.error('Error updating stats:', error);
-            this.showError('Failed to update statistics: ' + error.message);
+            throw error;
         }
     }
 
@@ -201,7 +227,7 @@ async fetchHistoricalData() {
             document.getElementById('priceChart').style.display = 'block';
         } catch (error) {
             console.error('Error creating chart:', error);
-            this.showError('Failed to create chart: ' + error.message);
+            throw error;
         }
     }
 
@@ -232,7 +258,6 @@ async fetchHistoricalData() {
     }
 }
 
-// Initialize the tracker when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     new BitcoinTracker();
 });
